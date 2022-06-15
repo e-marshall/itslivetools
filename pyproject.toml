@@ -1,12 +1,12 @@
 [tool.poetry]
-name = "utility_tools"
+name = "itslivetools"
 version = "0.0.2"
 description = "a small python package containing tools for accessing/working with its_live data with xarray"
 authors =  ['Emma Marshall <ekm328@gmail.com>']
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/e-marshall/utility_tools"
-repository = "https://github.com/e-marshall/utility_tools"
+homepage = "https://github.com/e-marshall/itslivetools"
+repository = "https://github.com/e-marshall/itslivetools"
 keywords = ["Python"]
 
 [tool.poetry.dependencies]
