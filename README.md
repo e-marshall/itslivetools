@@ -11,4 +11,4 @@ if fresh virtual env needed: `conda env create -n itslivetools_env python=3.10`
 ## Use
 
 `import itslivetools`
-`itslivetools.functionname()
+`itslivetools.functionname()`
