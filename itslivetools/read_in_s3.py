@@ -13,12 +13,12 @@ import cartopy
 import cartopy.feature as cfeature
 import json
 
-def read_in_s3(http_url):
+def read_in_s3(http_url, chunks = 'auto'):
     s3_url = http_url.replace('http','s3')
     s3_url = s3_url.replace('.s3.amazonaws.com','')
 
     datacube = xr.open_dataset(s3_url, engine = 'zarr',
                                 storage_options={'anon':True},
-                                chunks = 'auto')
+                                chunks = chunks)
 
     return datacube
