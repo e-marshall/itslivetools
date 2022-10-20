@@ -13,7 +13,7 @@ import cartopy
 import cartopy.feature as cfeature
 import json
 
-def get_bbox_single(input_xr):
+def get_bbox_single(input_xr, epsg = input_xr.mapping.spatial_epsg):
     
     '''Takes input xr object (from itslive data cube), plots a quick map of the footprint. 
     currently only working for granules in crs epsg 32645'''
@@ -28,7 +28,7 @@ def get_bbox_single(input_xr):
 
     #print(input_xr.mapping.spatial_epsg)
     #print(f"epsg:{input_xr.mapping.spatial_epsg}")
-    crs = f"epsg:{input_xr.mapping.spatial_epsg}"
+    crs = f"epsg:{epsg}"
     #crs = {'init':f'epsg:{input_xr.mapping.spatial_epsg}'}
     #crs = 'epsg:32645'
     #print(crs)
