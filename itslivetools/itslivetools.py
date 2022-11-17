@@ -193,7 +193,7 @@ def get_bbox_group(input_ls, bounds = [-180, 180, -90, 90]):
         poly_ls[element].plot(ax=ax, facecolor='none', edgecolor='red', lw=1.)
 
         
- lass IndGlacier:
+ class IndGlacier:
     
     def __init__(self, rgi_id, rgi_outline, dem, itslive, centerLine=None, ablationLine = None, lowestPoint = None):
         
