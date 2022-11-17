@@ -69,7 +69,28 @@ def find_granule_by_point(input_dict, input_point): #[lon,lat]
             pass
             #print('no')
     return target_granule_urls
+def get_bbox(input_xr, epsg=None):
+    
+    '''Takes input xr object (from itslive data cube), plots a quick map of the footprint. 
+    currently only working for granules in crs epsg 32645'''
 
+    xmin = input_xr.coords['x'].data.min()
+    xmax = input_xr.coords['x'].data.max()
+
+    ymin = input_xr.coords['y'].data.min()
+    ymax = input_xr.coords['y'].data.max()
+
+    pts_ls = [(xmin, ymin), (xmax, ymin),(xmax, ymax), (xmin, ymax), (xmin, ymin)]
+
+   
+    crs = f"epsg:{epsg}"
+    print(crs)
+    
+    polygon_geom = Polygon(pts_ls)
+    polygon = gpd.GeoDataFrame(index=[0], crs=crs, geometry=[polygon_geom]) 
+    #polygon = polygon.to_crs('epsg:4326')
+
+    return polygon
 
 
 def get_bbox_single(input_xr):
