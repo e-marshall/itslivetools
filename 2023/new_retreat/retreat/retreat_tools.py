@@ -13,6 +13,7 @@ import rasterio
 import matplotlib.patches as mpatches
 import numpy as np
 from scipy.stats import sem
+import scipy
 
 ## setup utility fns 
 def check_orig_files(item):
@@ -68,13 +69,26 @@ def get_footprint(ds, crs = None):
     
     return gdf
 
+def cube_process(cube):
+    
+    cube['img1_dt'] = (('time'), pd.to_datetime(cube.img1_date))
+    cube['img2_dt'] = (('time'), pd.to_datetime(cube.img2_date))
+    
+    cube['img_separation'] = (cube.img1_dt - cube.img2_dt).astype('timedelta64[D]') / np.timedelta64(1,'D')
+
+    cube = cube.drop(['img1_date','img2_date'])
+    
+    cube = cube.rename({'img1_dt':'img1_date',
+                        'img2_dt':'img2_date'})
+    return  cube
+
 def calc_sem(x):
     ''' calc standard error of measurement for an xarray data array at a given time step
     '''
     return sem(((x)*365).flatten(), nan_policy='omit')
 
 ## fn to combine, clip and build main data object structures 
-def clip_glacier_add_dem(rgi_id, rgi_full, retreat_xr, dem_xr): #all in local utm
+def clip_glacier_add_dem(rgi_id, rgi_outline_df, retreat_xr, dem_xr, output='full'): #all in local utm
     
     '''workflow to construct an xarray dataset for a single glacier containing velocity data and dem.
     steps are:
@@ -83,25 +97,33 @@ def clip_glacier_add_dem(rgi_id, rgi_full, retreat_xr, dem_xr): #all in local ut
     6., break up by elevation quartiles 
     '''
     
-    rgi_single = rgi_full.loc[rgi_full['RGIId'] == rgi_id]
     
-    retreat_clip = retreat_xr.rio.clip(rgi_single.geometry, rgi_single.crs)
+    rgi_single_outline = rgi_outline_df.loc[rgi_outline_df['RGIId'] == rgi_id]
+    
+    retreat_clip = retreat_xr.rio.clip(rgi_single_outline.geometry, rgi_single_outline.crs)
+    print('retreat clipped')
+    #convert one of the attrs to str so that it can be saved to netcdf
+    retreat_clip.attrs['spec'] = str(retreat_clip.attrs['spec'])
     
     retreat_clip_ds = retreat_clip.to_dataset(dim='band')
     
     valid_pixels = retreat_clip_ds.dis_mag.count(dim=['x','y'])
-    valid_pixels_max = retreat_clip_ds.dis_mag.notnull().any('mid_date').sum(['x','y'])
+    valid_pixels_max = retreat_clip_ds.dis_mag.notnull().any('time').sum(['x','y'])
     retreat_clip_ds['cov'] = valid_pixels / valid_pixels_max
-    
     #remove time steps where cov < 0.5
     retreat_clip_ds = retreat_clip_ds.where(retreat_clip_ds.cov >= 0.5, drop=True)
-    
-    dem_clip = dem_xr.rio.clip(rgi_single.geometry, rgi_single.crs)
-    
+    print('cov done')
+
+    dem_clip = dem_xr.rio.clip(rgi_single_outline.geometry, rgi_single_outline.crs)
+    print('dem clipped')
     dem_downsamp = dem_clip.interp_like(retreat_clip_ds, method = 'nearest')
     
-    retreat_clip_ds['sem_mag'] = (('time'), [calc_sem(retreat_clip_ds.isel(time=t).dis_mag.data) for t in range(len(retreat_clip_ds.time))])
+    retreat_clip_ds = retreat_clip_ds.drop_dims('band')
+    retreat_clip_ds['dis_mag_my'] = retreat_clip_ds['dis_mag']*365
+    retreat_clip_ds['z'] = dem_downsamp.NASADEM_HGT
+    retreat_clip_ds['sem_mag'] = retreat_clip_ds.dis_mag_my.stack(xy=('x','y')).reduce(scipy.stats.sem, dim='xy', nan_policy='omit')
 
+    print('sem calculated')
     
     
     zmin = np.nanmin(dem_downsamp.NASADEM_HGT.data)
@@ -114,7 +136,7 @@ def clip_glacier_add_dem(rgi_id, rgi_full, retreat_xr, dem_xr): #all in local ut
     z1 = dem_downsamp.NASADEM_HGT.where(np.logical_and(dem_downsamp.NASADEM_HGT >= zq1, dem_downsamp.NASADEM_HGT <= zmed), drop=True)
     z2 = dem_downsamp.NASADEM_HGT.where(np.logical_and(dem_downsamp.NASADEM_HGT >= zmed, dem_downsamp.NASADEM_HGT <= zq3), drop=True)
     z3 = dem_downsamp.NASADEM_HGT.where(np.logical_and(dem_downsamp.NASADEM_HGT >= zq3, dem_downsamp.NASADEM_HGT <= zmax), drop=True)
-    
+    print('z stuff')
     retreat_clip_ds['z0'] = z0
     retreat_clip_ds['z1'] = z1
     retreat_clip_ds['z2'] = z2
@@ -133,6 +155,11 @@ def clip_glacier_add_dem(rgi_id, rgi_full, retreat_xr, dem_xr): #all in local ut
                z2_cond_min, z2_cond_max, z3_cond_min, z3_cond_max]
     
     test = all(i for i in cond_ls)
+    retreat_clip_ds['z0_sem'] = retreat_clip_ds.where(retreat_clip_ds['z0'].notnull(), drop=True).dis_mag_my.stack(xy=('x','y')).reduce(scipy.stats.sem, dim='xy', nan_policy='omit')
+    retreat_clip_ds['z1_sem'] = retreat_clip_ds.where(retreat_clip_ds['z1'].notnull(), drop=True).dis_mag_my.stack(xy=('x','y')).reduce(scipy.stats.sem, dim='xy', nan_policy='omit')
+    retreat_clip_ds['z2_sem'] = retreat_clip_ds.where(retreat_clip_ds['z2'].notnull(), drop=True).dis_mag_my.stack(xy=('x','y')).reduce(scipy.stats.sem, dim='xy', nan_policy='omit')
+    retreat_clip_ds['z3_sem'] = retreat_clip_ds.where(retreat_clip_ds['z3'].notnull(), drop=True).dis_mag_my.stack(xy=('x','y')).reduce(scipy.stats.sem, dim='xy', nan_policy='omit')
+    print('finished z stuff')
     
     if test != True:
         
@@ -140,9 +167,19 @@ def clip_glacier_add_dem(rgi_id, rgi_full, retreat_xr, dem_xr): #all in local ut
         
     else:
     
-        pass
+        print('elevation masking should be all good')
+        
+   
     
-        return retreat_clip_ds
+    return retreat_clip_ds
+    
+    #elif output == 'seasonal':
+    #    retreat_clip_ds = retreat_clip_ds.where(retreat_clip_ds.img1_date.dt.season == retreat_clip_ds.img2_date.dt.season, drop=True)
+    
+     #   retreat_gb = retreat_clip_ds.groupby(retreat_clip_ds.time.dt.season).mean()
+        #retreat_gb.to_netcdf(f'/uufs/chpc.utah.edu/common/home/cryosphere/emarshall/328_velocity_results/retreat/ds_{rgi_id}.nc')
+     #   return retreat_gb
+ 
     
 ## functions to create datasets for seasonal analysis
 def calc_seasonal_sem_by_z(input_ds, z, var,rgi_id):
@@ -218,5 +255,37 @@ def wrapper_single_glacier(rgi_id, rgi_full, retreat_xr, dem_xr, var):
 
     return df
 
-
-#def centerline_data_prep(
+def wrapper_all_glaciers(xr_dict, var):
+    
+    df_dismag_ls, df_sem_ls = [],[]
+    
+    for key in xr_dict.keys():
+        
+        df_dismag = pd.concat([calc_seasonal_mean_by_z(xr_dict[key], z, var, key) for z in ['z0','z1','z2','z3','full']])
+        df_dismag_ls.append(df_dismag)
+        df_sem = pd.concat([calc_seasonal_sem_by_z(xr_dict[key],z,var, key) for z in ['z0','z1','z2','z3','full']])
+        df_sem_ls.append(df_sem)
+        
+        df_full = pd.concat([df_dismag_ls, df_sem_ls])
+        return df_full
+        
+def read_and_process_to_dict(path_to_file_dir):
+    
+    files = os.listdir(path_to_file_dir)
+    files = [f for f in files if 'rgi' not in f]
+    
+    keys_ls, vals_ls = [],[]
+    
+    for f in range(len(files)):
+        
+        g = files[f][3:-3]
+        keys_ls.append(g)
+        ds = xr.open_dataset(os.path.join(path_to_file_dir, files[f]))
+        ds['image_separation'] = (ds.img_separation*-1)
+        ds = ds.where(ds.img1_date.dt.season == ds.img2_date.dt.season, drop=True)
+        
+        vals_ls.append(ds)
+    retreat_dict = dict(zip(keys_ls, vals_ls))
+    
+    return retreat_dict
+        

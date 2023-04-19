@@ -51,3 +51,4 @@ def check_orig_files(item):
              
     elif len(set(sec_date_ls)) != 1:
              print('issue w sec date')
+
