@@ -9,4 +9,5 @@ d = { 'settings': { 'branch': 'main',
                                                                                     'itslivetools/access.py'),
                                      'itslivetools.access.find_granule_by_zone': ( 'access.html#find_granule_by_zone',
                                                                                    'itslivetools/access.py'),
+                                     'itslivetools.access.get_bbox': ('access.html#get_bbox', 'itslivetools/access.py'),
                                      'itslivetools.access.read_in_s3': ('access.html#read_in_s3', 'itslivetools/access.py')}}}
