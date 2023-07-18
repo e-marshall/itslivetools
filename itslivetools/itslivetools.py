@@ -13,6 +13,7 @@ import cartopy
 import cartopy.feature as cfeature
 import json
 
+
 def read_in_s3(http_url):
     s3_url = http_url.replace('http','s3')
     s3_url = s3_url.replace('.s3.amazonaws.com','')

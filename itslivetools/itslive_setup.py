@@ -16,62 +16,7 @@ class IndGlacier:
         self.ablationLine = ablationLine
         self.lowestPoint = lowestPoint
     
-    def calc_flowline(self):
-        '''function to calculate distance from glacier terminus along flowline. should ultimately be a method of the Glacier class.
-    takes an endpoint object and a ablation line vector. should return a 1D array with distance from terminus (or maybe a geodataframe with each point and dist as an attr??
-    NO - doesn't take endpont, only ablation line because the end point does not always lie along the ablation line -- not sure the best way to handle this'''
-
-   
-    
-        dl = np.zeros(len(list(self.ablationLine['geometry'].iloc[0].coords))) # make an empty array the list of the ablation line vector
-
-        #dl = np.zeros(5)
-
-        coords = list(self.ablationLine['geometry'].iloc[0].coords)
-
-        coords_X = [coords[point][0] for point in range(len(coords))]
-        coords_Y = [coords[point][1] for point in range(len(coords))]
-
-        dl[1:] = np.sqrt(np.diff(coords_X)**2 + np.diff(coords_Y)**2)
-
-        dist_profile = pd.DataFrame({'x_coords': coords_X,
-                                 'y_coords': coords_Y,
-                                 'distance': np.cumsum(dl)})
-    
-        geometry = gpd.points_from_xy(dist_profile['x_coords'], dist_profile['y_coords'])
-
-        gdf = gpd.GeoDataFrame(
-            dist_profile, geometry= geometry)
-        
-        gdf['ind_dist'] = gdf['distance'].diff()
-        gdf['x_diff'] = gdf['x_coords'].diff()
-        gdf['y_diff'] = gdf['y_coords'].diff()
-
-        # 'downsample' remove points closer to one another than 50 meters
-        #gdf_downsamp = gdf.loc[gdf['ind_dist'] >= 30]
-        # ^^^^ should I downsample or not? turns out that wasn't the memory issue so don't need to
-
-        #make list of tuples of flowline coords
-        flowline_points_ls = [(gdf['x_coords'].iloc[row], gdf['y_coords'].iloc[row]) for row in range(len(gdf))]
-        #list into array
-        flowline_points = np.array(flowline_points_ls)
-        #make xr objects of x and y coordinates with a new dimension 'points'
-        x = xr.DataArray(flowline_points[:,0], dims = 'points')
-        y = xr.DataArray(flowline_points[:,1], dims = 'points')
-        #make new xr object that is velocity data interpolated onto the points
-        interp_points = self.itslive.interp(x=x, y=y)
-        #reverse index so that first points are terminus, last are end of ablation zone
-        interp_points = interp_points.reindex(points = list(reversed(interp_points.points)))
-        
-        flowline_xr = gdf.to_xarray()
-        flowline_xr = flowline_xr.reindex(index = list(reversed(flowline_xr.index)))
-
-        interp_points['distance'] = ('points', flowline_xr.distance.data )
-
-
-
-        return interp_points
-    
+ 
 
 def ind_glacier_data_prep(rgi_id, rgi_full, itslive_dc, dem_obj, centerlines, ablationlines, lowestpoints, utm_code):
     '''function to prepare data to create an object of the `IndGlacier` class for a single glacier.
