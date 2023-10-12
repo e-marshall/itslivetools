@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "itslivetools"
+  site-url: "https://e-marshall.github.io/itslivetools"
+  description: "package for working with itslive ice velocity data"
+  repo-branch: main
+  repo-url: "https://github.com/e-marshall/itslivetools"
